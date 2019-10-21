@@ -20,7 +20,10 @@ const sources = {
     purpleGhost: './img/purpleGhost.png',
 
     //Pumpkin
-    pumpkin: './img/pumpkin.png'
+    pumpkin: './img/pumpkin.png',
+
+    //House
+    house: './img/house.png'
 };
 
 
@@ -36,7 +39,7 @@ function loadImages(sources, callback) {
         images[src] = new Image();
         images[src].onload = function() {
             if(++loadedImages >= numImages) {
-                callback(images);
+                callback();
             }
         };
         images[src].src = sources[src];
@@ -47,6 +50,16 @@ function loadImages(sources, callback) {
 
 loadImages(sources, function() {
 
-    window.requestAnimationFrame(step);
+    window.requestAnimationFrame(draw);
 });
 
+//Function to draw in the canvas
+
+function draw(){
+    ctx.fillStyle = "darkgreen";
+    ctx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+    
+    ctx.drawImage(images.house, gameCanvas.width - 400, gameCanvas.height - 400, 64, 64);
+
+    window.requestAnimationFrame(draw);
+}
