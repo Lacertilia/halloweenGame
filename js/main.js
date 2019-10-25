@@ -5,7 +5,7 @@ var currentGold;
 var goldPerSecond = 100;
 var startGold = 20;
 var currentWaveCandies = [{type: 'red', health: 0, x: 0, y: 0, direction: 'up', deadChecked:  true}];
-var ghosts = [{type: 'red', x: 300, y: 600}];
+var ghosts = [{type: 'purple', x: 300, y: 600}];
 var currentWave = 0;
 var candiesEaten = 0;
 var maxCandiesEaten = 50;
@@ -16,7 +16,7 @@ var gameOver = false;
 var gameCanvas = document.getElementById('gameCanvas');
 var ctx = gameCanvas.getContext('2d');
 
-var candySpeed = 4;
+var candySpeed = 2;
 
 //Speed of the candies(Red candy is multiplied by 1)
 var blueSpeedMult = 1.2;
@@ -39,13 +39,13 @@ var purpleGold = 100;
 var redDamage = 2;
 var blueDamage = 3;
 var greenDamage = 5;
-var purpleDamage = 15;
+var purpleDamage = 7.5;
 
 //Radius for ghosts damage
 var redGhostRadius = 100;
 var blueGhostRadius = 50;
 var greenGhostRadius = 100;
-var purpleGhostRadius = 200;
+var purpleGhostRadius = 150;
 
 //Cost of the ghosts and the pumpkin
 var redCost = 10;
@@ -104,60 +104,83 @@ function loadImages(sources, callback) {
 
 loadImages(sources, function() {
     currentGold = startGold;
-    window.requestAnimationFrame(draw);
+    window.requestAnimationFrame(game);
 });
 
-//Function to draw in the canvas
-
-function draw(){
-    //Clear the canvas
-    ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-    //Draw the background
-    drawBackground();
-    //Draw the roads
-    drawRoads();
-    
-    ctx.drawImage(images.house, 1000, 400, 64, 64);
-
-    if(Date.now() - lastSecond >= 1000 && waveInProgress){
-        currentGold += goldPerSecond;    
-        lastSecond = Date.now();
-    }
-    if(Date.now() - lastMoveCheck >= 20 && waveInProgress){
-        moveCandies();
-        lastMoveCheck = Date.now();
-    }
-
-    ctx.fillStyle = 'white';
-    ctx.font = '30px Arial';
-    ctx.fillText("Gold: " + currentGold, 1000, 30);
-    ctx.fillText((maxCandiesEaten - candiesEaten) + "/" + maxCandiesEaten, 0, 30);
-    ctx.drawImage(images.redCandy, 75, 0, 40, 40);
-
-    if(!waveInProgress){
+//Function for logic in the game
+function game(){
+    if(waveInProgress){
+        update();
+    }else {
         for(var i = 0; i < currentWaveCandies.length; i++){
             if(!currentWaveCandies[i].deadChecked){
                 candyDead(i);
             }
         }
     }
-    if(waveInProgress)
-    for(var i = 0; i < currentWaveCandies.length; i++){
-        for(var k = 0; k < ghosts.length; k++){
-            checkDistance(i, k);
-        }
-    }
-
-    drawGhosts();
-    drawCandies();
+    
     if(candiesEaten >= maxCandiesEaten){
         failGame();
     }
 
+    draw();
+    
     if(!gameOver)
-    window.requestAnimationFrame(draw);
+    window.requestAnimationFrame(game);
     else
     failGame();
+}
+
+//Function to draw in the canvas
+function draw(){
+    //Clear the canvas
+    ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+    
+    //Draw the background
+    drawBackground();
+    
+    //Draw the roads
+    drawRoads();
+    
+    printText();
+    
+    drawGhosts();
+
+    drawCandies();
+
+    //Draw the house at the end of the road
+    ctx.drawImage(images.house, 1000, 400, 64, 64);
+    
+}
+
+function update(){
+    if(Date.now() - lastSecond >= 1000){
+        currentGold += goldPerSecond;    
+        lastSecond = Date.now();
+        for(var i = 0; i < currentWaveCandies.length; i++){
+            for(var k = 0; k < ghosts.length; k++){
+                var distance = getDistance(i, k);
+                if(inRange(k, distance)){
+                    damageCandy(ghosts[k].type, i);
+                }
+            }
+        }
+    }
+    
+    moveCandies();
+}
+
+//Function to print text
+function printText(){
+    ctx.fillStyle = 'white';
+    ctx.font = '30px Arial';
+    
+    ctx.fillText("Gold: " + currentGold, 1000, 30);
+
+    ctx.fillText((maxCandiesEaten - candiesEaten) + "/" + maxCandiesEaten, 0, 30);
+    ctx.drawImage(images.redCandy, 75, 0, 40, 40);
+
+    ctx.fillText("Current wave: " + currentWave, 500, 30);
 }
 
 //Function to move the candies
@@ -165,7 +188,6 @@ function moveCandies(){
     for(var i = 0; i < currentWaveCandies.length; i++){
         var currentCandy = currentWaveCandies[i];
         if(currentCandy.health > 0){
-            checkPath(currentCandy.direction, i);
             if(currentCandy.type == 'red'){
                 moveCurrentCandy(i, candySpeed, currentCandy.direction);
             }else if(currentCandy.type == 'blue'){
@@ -201,12 +223,49 @@ function candyDead(i){
 }
 
 //Function to check distance between a ghost and a candy.
-function checkDistance(iCandy, iGhost){
+function getDistance(iCandy, iGhost){
     var dX = currentWaveCandies[iCandy].x - ghosts[iGhost].x;
     var dY = currentWaveCandies[iCandy].y - ghosts[iGhost].y;
-    var distance = Math.sqrt(Math.pow(dX, 2) + Math.pow(dY, 2));
 
-    console.log(distance);
+    return Math.sqrt(Math.pow(dX, 2) + Math.pow(dY, 2));
+}
+
+//Function to check if a candy is in range of a turret
+function inRange(iGhost, distance){
+    var type = ghosts[iGhost].type;
+    switch (type){
+        case 'red':
+            if(distance <= redGhostRadius)return true;
+            break;
+        case 'blue':
+            if(distance <= blueGhostRadius)return true;
+            break;
+        case 'green':
+            if(distance <= greenGhostRadius)return true;
+            break;
+        case 'purple':
+            if(distance <= purpleGhostRadius)return true;
+            break;
+    }
+    return false;
+}
+
+//Function to damage candies if in range of ghosts
+function damageCandy(type, iCandy){
+    if(currentWaveCandies[iCandy].health > 0)
+    switch(type){
+        case 'red':
+            currentWaveCandies[iCandy].health -= redDamage;
+            break;
+        case 'blue':
+            currentWaveCandies[iCandy].health -= blueDamage;
+            break;
+        case 'green':
+            currentWaveCandies[iCandy].health -= greenDamage;
+            break;
+        case 'purple':
+            currentWaveCandies[iCandy].health -= purpleDamage;
+    }
 }
 
 //Function to move one candy in a specified direction
@@ -310,13 +369,13 @@ function drawCandies(){
             //Check what type current candy is
             stillAlive = true;
             if(currentCandy.type == 'red'){
-                ctx.drawImage(images.redCandy, currentCandy.x, currentCandy.y, 32, 32);
+                ctx.drawImage(images.redCandy, currentCandy.x, currentCandy.y);
             }else if(currentCandy.type == 'blue'){
-                ctx.drawImage(images.blueCandy, currentCandy.x, currentCandy.y, 32, 32);
+                ctx.drawImage(images.blueCandy, currentCandy.x, currentCandy.y);
             }else if(currentCandy.type == 'green'){
-                ctx.drawImage(images.greenCandy, currentCandy.x, currentCandy.y, 32, 32);
+                ctx.drawImage(images.greenCandy, currentCandy.x, currentCandy.y);
             }else if(currentCandy.type == 'purple'){
-                ctx.drawImage(images.purpleCandy, currentCandy.x, currentCandy.y, 32, 32);
+                ctx.drawImage(images.purpleCandy, currentCandy.x, currentCandy.y);
             }
         }
     }
@@ -329,13 +388,13 @@ function drawCandies(){
 function drawGhosts(){
     for(var i = 0; i < ghosts.length; i++){
         if(ghosts[i].type == 'red'){
-            ctx.drawImage(images.redGhost, ghosts[i].x, ghosts[i].y, 32, 32);
+            ctx.drawImage(images.redGhost, ghosts[i].x, ghosts[i].y);
         }else if(ghosts[i].type == 'blue'){
-            ctx.drawImage(images.blueGhost, ghosts[i].x, ghosts[i].y, 32, 32);
+            ctx.drawImage(images.blueGhost, ghosts[i].x, ghosts[i].y);
         }else if(ghosts[i].type == 'green'){
-            ctx.drawImage(images.greenGhost, ghosts[i].x, ghosts[i].y, 32, 32);
+            ctx.drawImage(images.greenGhost, ghosts[i].x, ghosts[i].y);
         }else if(ghosts[i].type == 'purple'){
-            ctx.drawImage(images.purpleGhost, ghosts[i].x, ghosts[i].y, 32, 32);
+            ctx.drawImage(images.purpleGhost, ghosts[i].x, ghosts[i].y);
         }
     }
 }
@@ -346,14 +405,14 @@ function failGame(){
     drawBackground();
     ctx.font = '60px Arial';
     ctx.fillStyle = 'white';
-    ctx.fillText('Game Over!', 400, gameCanvas.height/2);
+    ctx.fillText('You got Diabetes and lost!', 200, gameCanvas.height/2);
 }
 
 //Function to start the next wave
 function startNextWave(){
     var stillAlive = false;
     currentWaveCandies.forEach(candy => {
-        if(candy.health != 0){
+        if(candy.health > 0){
             stillAlive = true;
         }
     });
@@ -432,7 +491,6 @@ document.addEventListener('keydown', function(e){
         case 'k':
             failGame();
             break;
-        case '':
 
         
     }
